@@ -1,0 +1,10 @@
+/node_modules
+/src/generated/prisma
+/prisma/migrations
+/dist
+/build
+/logs
+*.log
+*.env
+
+prettierrc.md

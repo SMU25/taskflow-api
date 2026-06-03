@@ -1,0 +1,7 @@
+{
+  "editor.formatOnSave": false, // вимикаємо стандартний форматер
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit" // дозволяємо ESLint+Prettier чистити та форматувати код
+  },
+  "prisma.pinToPrisma6": false
+}
