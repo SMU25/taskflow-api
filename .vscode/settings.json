@@ -1,7 +1,7 @@
 {
-  "editor.formatOnSave": false, // вимикаємо стандартний форматер
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit" // дозволяємо ESLint+Prettier чистити та форматувати код
-  },
-  "prisma.pinToPrisma6": false
+    "source.fixAll.eslint": "always"
+  }
 }

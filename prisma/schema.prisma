@@ -8,30 +8,39 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+generator zod {
+  provider = "zod-prisma-types"
+  output   = "../src/generated/zod"
+  useMultipleFiles = false // Один файл для простоти
+  createInputTypes = false // Не генеруємо Prisma input types
+}
+
 datasource db {
   provider = "postgresql"
 }
 
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
+  email     String   @unique /// @zod.string.email({ message: "Invalid email format" })
+  password  String   /// @zod.string.min(6, { message: "Password must be at least 6 characters" })
   createdAt DateTime @default(now())
   tasks     Task[]
 }
 
 model Task {
-  id          String   @id @default(uuid())
-  title       String
+  id          String     @id @default(uuid())
+  title       String     /// @zod.string.min(1, { message: "Title is required" })
   description String?
-  status      TaskStatus @default(PENDING) // PENDING, DONE
-  dueDate     DateTime
+  status      TaskStatus @default(pending)
+  dueDate     DateTime?
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 enum TaskStatus {
-  PENDING
-  DONE
+  pending
+  in_progress
+  completed
 }
