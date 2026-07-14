@@ -1,18 +1,18 @@
-import 'dotenv/config';
-
 import Fastify from 'fastify';
 
-import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
 import fastifyJwt from '@fastify/jwt';
 import fastifyRedis from '@fastify/redis';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 
+import 'dotenv/config';
 import {
   jsonSchemaTransform,
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 
+import { env } from './config/env';
 import { initScheduler } from './lib/cron';
 import { authRoutes } from './modules/auth/auth.routes';
 import { taskRoutes } from './modules/tasks/tasks.routes';
@@ -54,10 +54,8 @@ server.register(swaggerUi, {
 });
 
 // Реєстрація плагінів
-server.register(fastifyJwt, { secret: process.env.JWT_SECRET || 'secret' });
-server.register(fastifyRedis, {
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
+server.register(fastifyJwt, { secret: env.JWT_SECRET });
+server.register(fastifyRedis, { url: env.REDIS_URL });
 
 // Декоратор для захисту маршрутів (Аутентифікація)
 server.decorate('authenticate', async (request, reply) => {

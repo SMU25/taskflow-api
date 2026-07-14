@@ -4,7 +4,7 @@ import { prisma } from './prisma';
 
 export function initScheduler() {
   cron.schedule('* * * * *', async () => {
-    console.log('⏰ Checking for overdue tasks...');
+    console.log('⏰ Checking for overdue tasks...'); // fastify.log('⏰ Checking for overdue tasks...');
     const now = new Date();
 
     const overdueTasks = await prisma.task.findMany({
@@ -17,7 +17,7 @@ export function initScheduler() {
 
     overdueTasks.forEach((task) => {
       console.warn(
-        `🚨 ALERT: Task "${task.title}" for user ${task.user.email} is OVERDUE!`,
+        `🚨 ALERT: Task "${task.title}" for user ${task.user.email} is OVERDUE!`, // fastify.log('⏰ Checking for overdue tasks...');
       );
     });
   });
