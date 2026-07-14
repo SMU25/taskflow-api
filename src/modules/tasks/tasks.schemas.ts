@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { TaskSchema } from '../../generated/zod/index.js';
 
 // ==========================================
@@ -55,13 +56,6 @@ export const tasksListResponseSchema = z.array(taskResponseSchema);
  * Схема відповіді після оновлення
  */
 export const taskUpdateResponseSchema = z.object({
-  message: z.string(),
-});
-
-/**
- * Схема помилки
- */
-export const errorResponseSchema = z.object({
   message: z.string(),
 });
 
