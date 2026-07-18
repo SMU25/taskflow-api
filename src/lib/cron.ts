@@ -1,24 +1,24 @@
+import type { FastifyBaseLogger } from 'fastify';
+
 import cron from 'node-cron';
 
-import { prisma } from './prisma';
+import { prisma } from './prisma.js';
 
-export function initScheduler() {
+export function initScheduler(log: FastifyBaseLogger) {
   cron.schedule('* * * * *', async () => {
-    console.log('⏰ Checking for overdue tasks...');
+    log.info('⏰ Checking for overdue tasks...');
     const now = new Date();
 
     const overdueTasks = await prisma.task.findMany({
-      where: {
-        status: 'pending',
-        dueDate: { lt: now },
-      },
+      where: { status: 'pending', dueDate: { lt: now } },
       include: { user: true },
     });
 
-    overdueTasks.forEach((task) => {
-      console.warn(
-        `🚨 ALERT: Task "${task.title}" for user ${task.user.email} is OVERDUE!`,
+    for (const task of overdueTasks) {
+      log.warn(
+        { taskId: task.id, userEmail: task.user.email },
+        `🚨 ALERT: Task ID: ${task.id} ("${task.title}") for user ${task.user.email} is OVERDUE!`,
       );
-    });
+    }
   });
 }

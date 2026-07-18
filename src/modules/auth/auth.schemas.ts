@@ -27,10 +27,6 @@ export const logoutResponseSchema = z.object({
   message: z.string(),
 });
 
-export const errorResponseSchema = z.object({
-  message: z.string(),
-});
-
 // TypeScript Types
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type LoginBody = z.infer<typeof loginBodySchema>;

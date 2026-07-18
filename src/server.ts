@@ -1,99 +1,30 @@
-import 'dotenv/config';
+import { buildApp } from './app.js';
+import { env } from './config/env.js';
+import { initScheduler } from './lib/cron.js';
 
-import Fastify from 'fastify';
+const app = buildApp();
 
-import swagger from '@fastify/swagger';
-import swaggerUi from '@fastify/swagger-ui';
-import fastifyJwt from '@fastify/jwt';
-import fastifyRedis from '@fastify/redis';
-
-import {
-  jsonSchemaTransform,
-  serializerCompiler,
-  validatorCompiler,
-} from 'fastify-type-provider-zod';
-
-import { initScheduler } from './lib/cron';
-import { authRoutes } from './modules/auth/auth.routes';
-import { taskRoutes } from './modules/tasks/tasks.routes';
-
-const server = Fastify({ logger: true });
-
-server.setValidatorCompiler(validatorCompiler);
-server.setSerializerCompiler(serializerCompiler);
-
-// Swagger / OpenAPI
-server.register(swagger, {
-  openapi: {
-    openapi: '3.0.0',
-    info: {
-      title: 'TaskFlow API',
-      description: 'REST API for task management with JWT authentication',
-      version: '1.0.0',
-    },
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        },
-      },
-    },
-    tags: [
-      { name: 'Auth', description: 'Registration, login, logout' },
-      { name: 'Tasks', description: 'CRUD operations for tasks' },
-    ],
-  },
-  transform: jsonSchemaTransform,
-});
-
-server.register(swaggerUi, {
-  routePrefix: '/docs',
-  uiConfig: { docExpansion: 'list', deepLinking: true },
-});
-
-// Реєстрація плагінів
-server.register(fastifyJwt, { secret: process.env.JWT_SECRET || 'secret' });
-server.register(fastifyRedis, {
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
-
-// Декоратор для захисту маршрутів (Аутентифікація)
-server.decorate('authenticate', async (request, reply) => {
+async function start() {
   try {
-    await request.jwtVerify();
+    await app.listen({ port: env.PORT, host: '0.0.0.0' });
 
-    // Перевірка чи токен не в блеклісті Redis
-    const token = request.headers.authorization?.split(' ')[1];
-    const isBlacklisted = await server.redis.get(`blacklist:${token}`);
+    app.log.info(`🚀 Server running on port ${env.PORT}`);
 
-    if (isBlacklisted) {
-      return reply.status(401).send({ message: 'Token is invalidated' });
-    }
+    initScheduler(app.log); // ← тепер передаємо логер (закриває твій tsc-варнінг)
   } catch (err) {
-    reply.send(err);
-  }
-});
-
-// Реєстрація модульних маршрутів
-server.register(authRoutes, { prefix: '/api/auth' });
-server.register(taskRoutes, { prefix: '/api/tasks' });
-
-server.get('/ping', { schema: { hide: true } }, async () => {
-  return { status: 'OK', message: 'Server is running!' };
-});
-
-const start = async () => {
-  try {
-    await server.listen({ port: 5000, host: '0.0.0.0' });
-    console.log('🚀 Server running at http://localhost:5000');
-
-    initScheduler();
-  } catch (err) {
-    server.log.error(err);
+    app.log.error(err);
     process.exit(1);
   }
-};
+}
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, async () => {
+    app.log.info(`${signal} received — shutting down`);
+
+    await app.close(); // спрацює onClose → prisma.$disconnect()
+
+    process.exit(0);
+  });
+}
 
 start();
