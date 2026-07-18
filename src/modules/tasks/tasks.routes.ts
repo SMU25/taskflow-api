@@ -32,6 +32,7 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const task = await tasksService.create(request.user.id, request.body);
+
       return reply.status(201).send(task);
     },
   );
@@ -82,6 +83,7 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       await tasksService.remove(request.user.id, request.params.id);
+
       return reply.status(204).send();
     },
   );

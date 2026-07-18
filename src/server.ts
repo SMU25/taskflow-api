@@ -87,7 +87,7 @@ const start = async () => {
     await server.listen({ port: 5000, host: '0.0.0.0' });
     console.log('🚀 Server running at http://localhost:5000');
 
-    initScheduler();
+    // initScheduler(app.log);
   } catch (err) {
     server.log.error(err);
     process.exit(1);
