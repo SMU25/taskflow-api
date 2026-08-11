@@ -11,6 +11,11 @@ generator client {
 generator zod {
   provider = "zod-prisma-types"
   output   = "../../src/generated/zod"
+  // Шлях, який zod-генератор впише в `import type { Prisma } from ...`.
+  // Автовизначення промахується (рахує від папки схеми, а не від output).
+  // Задаємо ДИРЕКТОРІЮ клієнта відносно output — ім'я файлу генератор
+  // допише сам: "../prisma" → "../prisma/client".
+  prismaClientPath = "../prisma"
   useMultipleFiles = false // Один файл для простоти
   createInputTypes = false // Не генеруємо Prisma input types
 }

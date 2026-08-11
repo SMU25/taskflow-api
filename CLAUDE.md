@@ -6,18 +6,18 @@ REST API for task management built with Fastify 5 + TypeScript. Handles user aut
 
 ## Stack
 
-| Layer        | Technology                          |
-|--------------|-------------------------------------|
-| Framework    | Fastify 5 (`fastify`)               |
-| Language     | TypeScript 6 (ESM, `"type": "module"`) |
-| ORM          | Prisma 7 (`@prisma/client`)         |
-| Database     | PostgreSQL (`pg`, `@prisma/adapter-pg`) |
-| Cache        | Redis (`@fastify/redis`)            |
-| Auth         | JWT (`@fastify/jwt`)                |
-| Validation   | Zod + `fastify-type-provider-zod`   |
-| API Docs     | Swagger/OpenAPI (`@fastify/swagger`, `@fastify/swagger-ui`) |
-| Scheduler    | `node-cron`                         |
-| Dev runner   | `tsx watch`                         |
+| Layer      | Technology                                                  |
+| ---------- | ----------------------------------------------------------- |
+| Framework  | Fastify 5 (`fastify`)                                       |
+| Language   | TypeScript 6 (ESM, `"type": "module"`)                      |
+| ORM        | Prisma 7 (`@prisma/client`)                                 |
+| Database   | PostgreSQL (`pg`, `@prisma/adapter-pg`)                     |
+| Cache      | Redis (`@fastify/redis`)                                    |
+| Auth       | JWT (`@fastify/jwt`)                                        |
+| Validation | Zod + `fastify-type-provider-zod`                           |
+| API Docs   | Swagger/OpenAPI (`@fastify/swagger`, `@fastify/swagger-ui`) |
+| Scheduler  | `node-cron`                                                 |
+| Dev runner | `tsx watch`                                                 |
 
 ## Project Structure
 
@@ -59,13 +59,17 @@ docs/
 
 ```bash
 npm run dev        # Start with tsx watch (hot reload)
-npm run studio     # Open Prisma Studio
+npm run generate   # prisma generate (Prisma client + zod schemas) — required after clone
+npm run typecheck  # tsc --noEmit (typechecking only, never emits)
+npm run lint       # ESLint
 npm run lint:fix   # ESLint auto-fix
+npm run studio     # Open Prisma Studio
 ```
 
 ## Running Locally
 
 Requires `.env` with at minimum:
+
 ```
 DATABASE_URL=postgresql://...
 JWT_SECRET=...
@@ -79,8 +83,10 @@ Docker Compose is available (`docker-compose.yml`) for Postgres + Redis.
 - **Validation**: Always use Zod schemas defined in `*.schemas.ts`. Never validate manually inside route handlers.
 - **Type provider**: Use `fastify.withTypeProvider<ZodTypeProvider>()` per-plugin so `request.body` is fully typed.
 - **Auth guard**: Protected routes use `preHandler: [fastify.authenticate]` or `app.addHook('preHandler', fastify.authenticate)`.
-- **Prisma access**: Only inside `*.repository.ts`, imported from `../../lib/prisma.js`. Never in services/routes.
-- **Imports**: All local imports must use `.js` extension (ESM requirement).
+- **Prisma access**: Only inside `*.repository.ts`, imported from `../../lib/prisma`. Never in services/routes.
+- **Imports**: local imports are written **without a file extension** (`'../../lib/prisma'`). This works because `tsconfig` uses `"moduleResolution": "bundler"` and dev runs on `tsx`. Consequence: `tsc` is a **typechecker only** — the production build must go through a bundler (tsup/esbuild), which rewrites specifiers. Never `tsc`-emit and run the output with bare `node`. See `docs/PRINCIPLES.md` → `2026-08-11 · Імпорти без розширення`.
+- **Generated code** (`src/generated/**`) is gitignored, prettier-ignored and eslint-ignored. Never edit it by hand — change the generator config in `prisma/schema/schema.prisma` and run `npm run generate`. A fresh clone must run `npm run generate` before `npm run typecheck`.
+- **Line endings**: LF in the repo (`.gitattributes`). On Windows run `npm run lint:fix` if prettier complains about `␍`.
 - **No test framework yet** — `npm test` exits 1.
 
 ## Layering & Error Handling
@@ -94,6 +100,7 @@ Docker Compose is available (`docker-compose.yml`) for Postgres + Redis.
 - **repository** (`*.repository.ts`): the ONLY place that imports `prisma`/`Prisma`. Translates DB-specific failures (e.g. `P2002`) into domain errors.
 
 **Errors:**
+
 - Domain errors extend `AppError` (`lib/errors.ts`) with `statusCode` + `code`. Throw them — never `reply.status(4xx)` inside a handler.
 - One central `setErrorHandler` maps everything to the envelope `{ error: { code, message, details? } }`. Stack traces go to logs only, never to responses.
 - `instanceof` works only against a real runtime class (`AppError`, `Prisma.PrismaClientKnownRequestError`). NOT against type-only interfaces (`FastifyError`) — narrow those with a single boundary cast.
@@ -107,6 +114,7 @@ Docker Compose is available (`docker-compose.yml`) for Postgres + Redis.
 ## Data Models
 
 ### User
+
 ```
 id        String   (uuid, PK)
 email     String   (unique, validated email)
@@ -116,6 +124,7 @@ tasks     Task[]
 ```
 
 ### Task
+
 ```
 id          String      (uuid, PK)
 title       String      (min 1 char)
@@ -129,17 +138,17 @@ updatedAt   DateTime
 
 ## API Endpoints
 
-| Method | Path                  | Auth | Description              |
-|--------|-----------------------|------|--------------------------|
-| POST   | /api/auth/register    | No   | Create user account      |
-| POST   | /api/auth/login       | No   | Get JWT token            |
-| POST   | /api/auth/logout      | Yes  | Blacklist token in Redis |
-| GET    | /api/tasks            | Yes  | List current user tasks  |
-| POST   | /api/tasks            | Yes  | Create task              |
-| PUT    | /api/tasks/:id        | Yes  | Update task fields       |
-| DELETE | /api/tasks/:id        | Yes  | Delete task              |
-| GET    | /ping                 | No   | Health check             |
-| GET    | /docs                 | No   | Swagger UI               |
+| Method | Path               | Auth | Description              |
+| ------ | ------------------ | ---- | ------------------------ |
+| POST   | /api/auth/register | No   | Create user account      |
+| POST   | /api/auth/login    | No   | Get JWT token            |
+| POST   | /api/auth/logout   | Yes  | Blacklist token in Redis |
+| GET    | /api/tasks         | Yes  | List current user tasks  |
+| POST   | /api/tasks         | Yes  | Create task              |
+| PUT    | /api/tasks/:id     | Yes  | Update task fields       |
+| DELETE | /api/tasks/:id     | Yes  | Delete task              |
+| GET    | /ping              | No   | Health check             |
+| GET    | /docs              | No   | Swagger UI               |
 
 ## Scheduler
 

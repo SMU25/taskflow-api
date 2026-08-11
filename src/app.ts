@@ -15,6 +15,7 @@ import { env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { taskRoutes } from './modules/tasks/tasks.routes.js';
+import { workspaceRoutes } from './modules/workspaces/workspaces.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/errorHandler.js';
 
@@ -40,6 +41,7 @@ export function buildApp() {
       tags: [
         { name: 'Auth', description: 'Registration, login, logout' },
         { name: 'Tasks', description: 'CRUD operations for tasks' },
+        { name: 'Workspaces', description: 'CRUD operations for workspaces' },
       ],
     },
     transform: jsonSchemaTransform,
@@ -58,6 +60,7 @@ export function buildApp() {
 
   app.register(authRoutes, { prefix: '/api/auth' });
   app.register(taskRoutes, { prefix: '/api/tasks' });
+  app.register(workspaceRoutes, { prefix: '/api/workspaces' });
 
   app.get('/ping', { schema: { hide: true } }, async () => ({
     status: 'OK',
