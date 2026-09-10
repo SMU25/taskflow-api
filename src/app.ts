@@ -11,13 +11,14 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 
-import { env } from './config/env.js';
-import { prisma } from './lib/prisma.js';
-import { authRoutes } from './modules/auth/auth.routes.js';
-import { taskRoutes } from './modules/tasks/tasks.routes.js';
-import { workspaceRoutes } from './modules/workspaces/workspaces.routes.js';
-import { registerAuth } from './plugins/auth.js';
-import { registerErrorHandler } from './plugins/errorHandler.js';
+import { env } from './config/env';
+import { prisma } from './lib/prisma';
+import { authRoutes } from './modules/auth/auth.routes';
+import { memberRoutes } from './modules/members/members.routes';
+import { taskRoutes } from './modules/tasks/tasks.routes';
+import { workspaceRoutes } from './modules/workspaces/workspaces.routes';
+import { registerAuth } from './plugins/auth';
+import { registerErrorHandler } from './plugins/errorHandler';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -40,8 +41,9 @@ export function buildApp() {
       },
       tags: [
         { name: 'Auth', description: 'Registration, login, logout' },
-        { name: 'Tasks', description: 'CRUD operations for tasks' },
-        { name: 'Workspaces', description: 'CRUD operations for workspaces' },
+        { name: 'Tasks', description: 'CRUD operations for Tasks' },
+        { name: 'Workspaces', description: 'CRUD operations for Workspaces' },
+        { name: 'Members', description: 'CRUD operations for Members' },
       ],
     },
     transform: jsonSchemaTransform,
@@ -61,6 +63,9 @@ export function buildApp() {
   app.register(authRoutes, { prefix: '/api/auth' });
   app.register(taskRoutes, { prefix: '/api/tasks' });
   app.register(workspaceRoutes, { prefix: '/api/workspaces' });
+  app.register(memberRoutes, {
+    prefix: '/api/workspaces/:workspaceId/members',
+  });
 
   app.get('/ping', { schema: { hide: true } }, async () => ({
     status: 'OK',
