@@ -21,6 +21,10 @@ export interface ManageMemberScope extends UserScope {
   memberId: string;
 }
 
+export interface ActorLookup extends UserScope {
+  includeDeleted?: boolean;
+}
+
 /**
  * Поля перелічені явно, хоч і збігаються з `UserScope`.
  * `extends UserScope` зробив би `{ ...scope, role }` валідним — а це рівно та

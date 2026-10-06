@@ -18,6 +18,7 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
   app.addHook('preHandler', fastify.authenticate);
+  app.addHook('preHandler', fastify.requireMembership('ADMIN'));
 
   app.post(
     '/',

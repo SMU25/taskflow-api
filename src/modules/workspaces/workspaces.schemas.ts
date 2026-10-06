@@ -15,7 +15,7 @@ export const updateWorkspaceBodySchema = WorkspaceSchema.pick({
 }).partial();
 
 export const workspaceParamsSchema = z.object({
-  id: z.uuid('Invalid workspace ID format'),
+  workspaceId: z.uuid('Invalid workspace ID format'),
 });
 
 export const workspaceResponseSchema = WorkspaceSchema.omit({
@@ -36,9 +36,6 @@ export const workspacesListResponseSchema = z.array(
 export const workspacesTrashListResponseSchema = z.array(
   workspacesTrashResponseSchema.omit({ members: true, projects: true }),
 );
-export const workspaceUpdateResponseSchema = z.object({
-  message: z.string(),
-});
 
 export type CreateWorkspaceBody = z.infer<typeof createWorkspaceBodySchema>;
 export type UpdateWorkspaceBody = z.infer<typeof updateWorkspaceBodySchema>;
@@ -52,7 +49,4 @@ export type WorkspacesListResponse = z.infer<
 >;
 export type WorkspacesTrashListResponse = z.infer<
   typeof workspacesTrashListResponseSchema
->;
-export type WorkspaceUpdateResponse = z.infer<
-  typeof workspaceUpdateResponseSchema
 >;

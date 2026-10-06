@@ -1,5 +1,3 @@
-import type { Role } from '../../generated/prisma/enums';
-
 export interface CreateWorkspaceData {
   name: string;
   slug: string;
@@ -10,13 +8,4 @@ export interface CreateWorkspaceData {
 // і коментар усередині його не вимикає (коментар — не член інтерфейсу).
 export interface UpdateWorkspaceData {
   name?: string;
-}
-
-export interface WorkspaceScope {
-  userId: string;
-  id: string;
-}
-
-export interface WorkspaceRoleScope extends WorkspaceScope {
-  roles: Role[];
 }

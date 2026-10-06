@@ -10,7 +10,7 @@ import type {
   CreateWorkspaceBody,
   UpdateWorkspaceBody,
 } from './workspaces.schemas';
-import type { UpdateWorkspaceData, WorkspaceScope } from './workspaces.types';
+import type { UpdateWorkspaceData } from './workspaces.types';
 
 export class WorkspacesService {
   constructor(private readonly repo: WorkspacesRepository) {}
@@ -23,12 +23,12 @@ export class WorkspacesService {
     return this.repo.removedListByMember(userId);
   }
 
-  async itemById(params: WorkspaceScope) {
-    const item = await this.repo.findForMember(params);
+  async itemById(id: string) {
+    const workspace = await this.repo.findById(id);
 
-    if (!item) throw new NotFoundError('Workspace not found');
+    if (!workspace) throw new NotFoundError('Workspace not found');
 
-    return item;
+    return workspace;
   }
 
   async create(userId: string, data: CreateWorkspaceBody) {
@@ -40,48 +40,27 @@ export class WorkspacesService {
     return await this.repo.create(userId, { ...data, slug });
   }
 
-  async update(params: WorkspaceScope, input: UpdateWorkspaceBody) {
+  async update(id: string, input: UpdateWorkspaceBody) {
     const data: UpdateWorkspaceData = {};
 
     if (input.name !== undefined) {
       data.name = input.name;
     }
 
-    const result = await this.repo.updateForRoles(
-      {
-        ...params,
-        roles: ['OWNER', 'ADMIN'],
-      },
-      data,
-    );
-    if (result.count === 0) throw new NotFoundError('Workspace not found');
-
-    return { message: 'Workspace updated successfully' };
+    return await this.repo.update(id, data);
   }
 
-  async remove(params: WorkspaceScope) {
-    const slug = slugify(`deleted-${params.id}-${nanoid(6)}`, {
+  async remove(id: string) {
+    const slug = slugify(`deleted-${id}-${nanoid(6)}`, {
       lower: true,
       strict: true,
     });
 
-    const result = await this.repo.softDeleteForRoles(
-      {
-        ...params,
-        roles: ['OWNER'],
-      },
-      slug,
-    );
-    if (result.count === 0) throw new NotFoundError('Workspace not found');
+    await this.repo.softDelete(id, slug);
   }
 
-  async permanentlyDelete(params: WorkspaceScope) {
-    const result = await this.repo.permanentlyDeleteForRoles({
-      ...params,
-      roles: ['OWNER'],
-    });
-
-    if (result.count === 0) throw new NotFoundError('Workspace not found');
+  async permanentlyDelete(id: string) {
+    await this.repo.permanentlyDelete(id);
   }
 }
 

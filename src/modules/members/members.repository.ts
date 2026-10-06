@@ -1,7 +1,11 @@
 import { Prisma, type Role } from '../../generated/prisma/client';
 import { ConflictError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
-import type { CreateMemberData, MemberScope, UserScope } from './members.types';
+import type {
+  ActorLookup,
+  CreateMemberData,
+  MemberScope,
+} from './members.types';
 
 const PUBLIC_USER_SELECT = {
   id: true,
@@ -10,14 +14,18 @@ const PUBLIC_USER_SELECT = {
 
 export class MembersRepository {
   // чи є юзер учасником workspace (member)
-  findActor({ userId, workspaceId }: UserScope) {
+  findActor({ userId, workspaceId, includeDeleted = false }: ActorLookup) {
     return prisma.membership.findFirst({
       where: {
         userId,
         workspaceId,
-        workspace: {
-          deletedAt: null,
-        },
+        ...(!includeDeleted
+          ? {
+              workspace: {
+                deletedAt: null,
+              },
+            }
+          : {}),
       },
       select: { role: true },
     });

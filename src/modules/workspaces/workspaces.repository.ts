@@ -1,25 +1,24 @@
-import { Prisma } from '../../generated/prisma/client';
-import { ConflictError } from '../../lib/errors';
+import { Prisma, Role } from '../../generated/prisma/client';
+import { ConflictError, NotFoundError } from '../../lib/errors';
 import { prisma } from '../../lib/prisma';
 import type {
   CreateWorkspaceData,
   UpdateWorkspaceData,
-  WorkspaceRoleScope,
-  WorkspaceScope,
 } from './workspaces.types';
 
+const WORKSPACE_INCLUDE = {
+  members: true,
+  projects: { where: { deletedAt: null } },
+} satisfies Prisma.WorkspaceInclude;
+
 export class WorkspacesRepository {
-  findForMember({ userId, id }: WorkspaceScope) {
+  findById(id: string) {
     return prisma.workspace.findFirst({
       where: {
         id,
         deletedAt: null,
-        members: { some: { userId } },
       },
-      include: {
-        members: true,
-        projects: { where: { deletedAt: null } },
-      },
+      include: WORKSPACE_INCLUDE,
     });
   }
 
@@ -49,13 +48,10 @@ export class WorkspacesRepository {
         data: {
           ...data,
           members: {
-            create: { userId, role: 'OWNER' },
+            create: { userId, role: Role.OWNER },
           },
         },
-        include: {
-          members: true,
-          projects: true,
-        },
+        include: WORKSPACE_INCLUDE,
       });
     } catch (error) {
       if (
@@ -68,81 +64,87 @@ export class WorkspacesRepository {
     }
   }
 
-  updateForRoles(
-    { userId, id, roles }: WorkspaceRoleScope,
-    data: UpdateWorkspaceData,
-  ) {
-    return prisma.workspace.updateMany({
-      where: {
-        id,
-        deletedAt: null,
-        members: {
-          some: {
-            userId,
-            role: { in: roles },
-          },
-        },
-      },
-      data,
-    });
-  }
-
-  softDeleteForRoles({ id, userId, roles }: WorkspaceRoleScope, slug: string) {
-    return prisma.$transaction(async (tx) => {
-      const now = new Date();
-
-      const workspace = await tx.workspace.updateMany({
+  async update(id: string, data: UpdateWorkspaceData) {
+    try {
+      return await prisma.workspace.update({
         where: {
           id,
           deletedAt: null,
-          members: {
-            some: {
-              userId,
-              role: { in: roles },
-            },
-          },
         },
-        data: {
-          slug,
-          deletedAt: now,
-        },
+        data,
+        include: WORKSPACE_INCLUDE,
       });
-      if (workspace.count === 0) return workspace; // прав нема — до каскаду не доходимо
-
-      // Права доведені вище. Знизу вгору: таски → проєкти.
-      await tx.task.updateMany({
-        where: {
-          deletedAt: null,
-          project: { workspaceId: id },
-        },
-        data: { deletedAt: now },
-      });
-
-      await tx.project.updateMany({
-        where: {
-          deletedAt: null,
-          workspaceId: id,
-        },
-        data: { deletedAt: now },
-      });
-
-      return workspace;
-    });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundError('Workspace not found');
+      }
+      throw error;
+    }
   }
 
-  permanentlyDeleteForRoles({ userId, id, roles }: WorkspaceRoleScope) {
-    return prisma.workspace.deleteMany({
-      where: {
-        id,
-        deletedAt: { not: null },
-        members: {
-          some: {
-            userId,
-            role: { in: roles },
+  async softDelete(id: string, slug: string) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const now = new Date();
+
+        await tx.workspace.update({
+          where: {
+            id,
+            deletedAt: null,
           },
+          data: {
+            slug,
+            deletedAt: now,
+          },
+        });
+
+        await tx.task.updateMany({
+          where: {
+            deletedAt: null,
+            project: { workspaceId: id },
+          },
+          data: { deletedAt: now },
+        });
+
+        await tx.project.updateMany({
+          where: {
+            deletedAt: null,
+            workspaceId: id,
+          },
+          data: { deletedAt: now },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundError('Workspace not found');
+      }
+      throw error;
+    }
+  }
+
+  async permanentlyDelete(id: string) {
+    try {
+      return await prisma.workspace.delete({
+        where: {
+          id,
+          deletedAt: { not: null },
         },
-      },
-    });
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new ConflictError('Workspace is not in trash');
+      }
+      throw error;
+    }
   }
 }
 

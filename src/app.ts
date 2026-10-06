@@ -19,6 +19,7 @@ import { taskRoutes } from './modules/tasks/tasks.routes';
 import { workspaceRoutes } from './modules/workspaces/workspaces.routes';
 import { registerAuth } from './plugins/auth';
 import { registerErrorHandler } from './plugins/errorHandler';
+import { registerMembership } from './plugins/membership';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -59,6 +60,7 @@ export function buildApp() {
 
   registerAuth(app); // decorate fastify.authenticate — ДО реєстрації роутів, що його юзають
   registerErrorHandler(app); // setErrorHandler — тепер конверт помилок активний
+  registerMembership(app);
 
   app.register(authRoutes, { prefix: '/api/auth' });
   app.register(taskRoutes, { prefix: '/api/tasks' });
