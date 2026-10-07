@@ -22,6 +22,7 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/',
     {
+      preHandler: fastify.requireMembership('ADMIN'),
       schema: {
         tags: ['Members'],
         summary: 'Add a Member to Workspace',
@@ -30,22 +31,23 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
         body: addMemberBodySchema,
         response: {
           201: memberResponseSchema,
-          400: memberResponseSchema,
+          400: errorResponseSchema,
           403: errorResponseSchema,
           404: errorResponseSchema,
+          409: errorResponseSchema,
         },
       },
     },
     async (request, reply) => {
-      const { user, params, body } = request;
+      const { user, params, body, membership } = request;
 
-      const member = await membersService.add(
-        {
-          userId: user.id,
-          workspaceId: params.workspaceId,
-        },
-        body,
-      );
+      const actor = {
+        userId: user.id,
+        workspaceId: params.workspaceId,
+        role: membership.role,
+      };
+
+      const member = await membersService.add(actor, body);
 
       return reply.status(201).send(member);
     },
@@ -54,6 +56,7 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Members'],
         summary: 'Get all Members for this workspace',
@@ -61,24 +64,22 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
         params: memberScopeParamsSchema,
         response: {
           200: membersListResponseSchema,
-          400: memberResponseSchema,
+          400: errorResponseSchema,
           404: errorResponseSchema,
         },
       },
     },
     (request) => {
-      const { user, params } = request;
+      const { params } = request;
 
-      return membersService.list({
-        userId: user.id,
-        workspaceId: params.workspaceId,
-      });
+      return membersService.list(params.workspaceId);
     },
   );
 
   app.patch(
     '/:memberId',
     {
+      preHandler: fastify.requireMembership('ADMIN'),
       schema: {
         tags: ['Members'],
         summary: 'Update a Member of Workspace',
@@ -87,30 +88,29 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
         body: updateMemberBodySchema,
         response: {
           200: memberResponseSchema,
-          400: memberResponseSchema,
+          400: errorResponseSchema,
           403: errorResponseSchema,
           404: errorResponseSchema,
-          409: errorResponseSchema,
         },
       },
     },
     (request) => {
-      const { user, params, body } = request;
+      const { user, params, body, membership } = request;
 
-      return membersService.update(
-        {
-          userId: user.id,
-          workspaceId: params.workspaceId,
-          memberId: params.memberId,
-        },
-        body,
-      );
+      const actor = {
+        userId: user.id,
+        workspaceId: params.workspaceId,
+        role: membership.role,
+      };
+
+      return membersService.update(actor, params.memberId, body);
     },
   );
 
   app.delete(
     '/:memberId',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Members'],
         summary: 'Delete a Member from Workspace',
@@ -118,7 +118,7 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
         params: memberParamsSchema,
         response: {
           204: z.void(),
-          400: memberResponseSchema,
+          400: errorResponseSchema,
           403: errorResponseSchema,
           404: errorResponseSchema,
           409: errorResponseSchema,
@@ -126,13 +126,15 @@ export const memberRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const { user, params } = request;
+      const { user, params, membership } = request;
 
-      await membersService.delete({
+      const actor = {
         userId: user.id,
         workspaceId: params.workspaceId,
-        memberId: params.memberId,
-      });
+        role: membership.role,
+      };
+
+      await membersService.delete(actor, params.memberId);
 
       return reply.status(204).send();
     },
