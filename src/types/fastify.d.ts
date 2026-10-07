@@ -1,9 +1,20 @@
+import { FastifyReply, type preHandlerHookHandler } from 'fastify';
+
 import '@fastify/jwt';
-import { FastifyRequest, FastifyReply } from 'fastify';
+
+import type { Role } from '../generated/prisma/enums';
 
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void>;
+    requireMembership(
+      minRole: Role,
+      options?: { allowDeleted?: boolean },
+    ): preHandlerHookHandler;
+  }
+
+  interface FastifyRequest {
+    membership: { role: Role };
   }
 }
 

@@ -1,0 +1,34 @@
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String   /// @zod.string.min(1, { message: "Workspace name is required" })
+  slug      String   @unique          // для гарних URL /w/acme-inc
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  members   Membership[]
+  projects  Project[]
+}
+
+model Membership {
+  id          String    @id @default(uuid())
+  role        Role      @default(MEMBER)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      String
+  workspaceId String
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])          // 1 членство на пару юзер×воркспейс
+  @@index([workspaceId])
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  MANAGER
+  MEMBER
+}

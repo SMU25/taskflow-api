@@ -1,0 +1,24 @@
+model Task {
+  id          String     @id @default(uuid())
+  title       String     /// @zod.string.min(1, { message: "Title is required" })
+  description String?
+  status      TaskStatus @default(pending)
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+}

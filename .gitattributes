@@ -1,0 +1,4 @@
+# У репозиторії тримаємо LF: код їде в Docker/Linux, а CRLF ламає
+# і shell-скрипти, і prettier (endOfLine: "lf" за замовчуванням).
+# На Windows файли в робочій копії лишаються як є — git нормалізує при коміті.
+* text=auto eol=lf
