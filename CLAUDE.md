@@ -64,6 +64,12 @@ prisma/
   migrations/                # Forward-only, never edited after apply
   backfills/                 # One-off data-migration scripts (`npx tsx`), kept as documentation
 scripts/                     # Ad-hoc maintenance scripts
+test/                        # Integration tests (Vitest + app.inject + real Postgres) — see "Testing"
+  helpers.ts                 # api(user), signUp, createWorkspace, addMember, createProject, seedWorkspace
+  setup.ts                   # per file: TRUNCATE before each test, app.close() after all
+  global-setup.ts            # once: create <db>_test if missing + prisma migrate deploy
+  *.test.ts
+vitest.config.ts             # swaps DATABASE_URL to <db>_test, runs files sequentially
 docs/
   PRINCIPLES.md              # Engineering principles + decision log (READ THIS)
   PHASE-1-LAYERING.md        # Phase 1 refactor guide
@@ -80,6 +86,8 @@ npm run typecheck  # tsc --noEmit (typechecking only, never emits)
 npm run lint       # ESLint
 npm run lint:fix   # ESLint auto-fix (also normalizes CRLF → LF on Windows)
 npm run studio     # Open Prisma Studio
+npm test           # Vitest, one run (needs `docker compose up -d`)
+npm run test:watch # Vitest in watch mode
 
 npm run migrate:dev                        # prisma migrate dev
 npm run create:migration                   # --create-only (write SQL, don't apply)
@@ -120,7 +128,7 @@ Docker Compose is available (`docker-compose.yml`) for Postgres + Redis.
 - **Object parameters** when a method takes ≥2 arguments, or any two arguments of the same type in a row (`{ id, userId }`, not `(id, userId)` — the compiler cannot catch a swap). A single argument stays positional. Shared shapes live in `*.types.ts` (`MemberScope`, `ActorContext`). Never spread a scope into write data (`{ ...scope, role }`) — build write-models field by field; a scope means "who is asking", not "what to create".
 - **Same shape ≠ same meaning.** Two interfaces with identical fields stay separate when they answer different questions (`FindActor` = "what role does this user have?" — the input; `ActorContext` = the answer, including `role`). A query's input must never require what the query returns.
 - **`interface` for hand-written object shapes, `type` for derived/mapped/union types.** Write the shape out explicitly rather than `interface X extends Partial<Pick<...>> {}` — an empty interface body is an ESLint error, and a comment inside it does not count as a member.
-- **No test framework yet** — `npm test` exits 1.
+- **Every behaviour change ships with a test** in `test/<module>.test.ts` — see "Testing".
 
 ## Layering & Error Handling
 
@@ -310,6 +318,19 @@ Rules:
 **Nested resources (projects, later tasks):** the guard proves the _workspace_, not the child. Every single-row query is scoped by the pair `{ id, workspaceId }` — otherwise a member of A can address a project of B through `/workspaces/A/projects/<id-from-B>` (IDOR). For the same reason `P2025` on a nested resource means "missing, foreign or wrong state" and is translated to 404; a 409 like on the workspace's own permanent delete is only honest when the guard has already proven the row exists.
 
 **Known gap:** the tasks module is still on the Phase 1 model — it scopes by `Task.userId` and has no project. `tasksRepository.create` throws on purpose until the module is reworked to be project-scoped and tenant-isolated.
+
+## Testing
+
+Integration tests only: `app.inject()` drives the full stack (authenticate → validation → guard → service → repository) against a **real** Postgres. No mocks of the repository — the IDOR and 404/403 bugs all lived in `where` clauses, which a mocked repository cannot see.
+
+- **Database:** same server as `.env`, database name + `_test` (`taskflow_db` → `taskflow_db_test`). `vitest.config.ts` derives the URL — no second file with the password. `assertTestDatabase` refuses to migrate or truncate anything not ending in `_test`.
+- **Isolation:** `TRUNCATE` of every table before each test; files run one at a time (`fileParallelism: false`) because they share the database.
+- **Schema:** `prisma migrate deploy` once per run — applies new migrations, never wipes. If the test DB drifts (an edited migration), drop `<db>_test` and rerun.
+- **Write a test as a scenario:** `seedWorkspace()` gives `{ workspace, owner, admin, manager, member, outsider }` (each with `token`, `id`, and `memberId` where relevant). Call `api(user).patch(url, body)`, assert with `expect(res.statusCode, res.body).toBe(...)` — the second argument prints the response body when it fails.
+- **Role matrices** go through `it.each([['member', 403], ['admin', 200]] as const)` with `seed[role]`.
+- **Use `prisma` directly in a test only** to arrange data the API cannot create yet (tasks before Step 6) or to assert DB state the API does not expose (`deletedAt`, row count after permanent delete).
+- **Test mode in `src`:** `NODE_ENV=test` turns off the Fastify request logger and drops bcrypt to 4 rounds (49 s → 10 s). Nothing else in `src` may branch on `NODE_ENV`.
+- **A test must be able to fail.** When adding a guard/filter, break it once locally and check the test goes red.
 
 ## Scheduler
 

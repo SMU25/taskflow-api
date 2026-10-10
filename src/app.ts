@@ -23,7 +23,8 @@ import { registerErrorHandler } from './plugins/errorHandler';
 import { registerMembership } from './plugins/membership';
 
 export function buildApp() {
-  const app = Fastify({ logger: true });
+  // У тестах лог кожного запиту топить звіт Vitest; помилки й так видно в assert'ах.
+  const app = Fastify({ logger: env.NODE_ENV !== 'test' });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);

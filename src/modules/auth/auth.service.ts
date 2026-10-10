@@ -1,10 +1,13 @@
 import bcrypt from 'bcrypt';
 
+import { env } from '../../config/env';
 import { UnauthorizedError } from '../../lib/errors.js';
 import { AuthRepository, authRepository } from './auth.repository.js';
 import type { LoginBody, RegisterBody } from './auth.schemas.js';
 
-const BCRYPT_ROUNDS = 10;
+// bcrypt навмисно повільний (~50 мс на 10 раундах) — це і є захист від перебору.
+// У тестах хешуємо сотні юзерів, тож знижуємо до мінімуму: стійкість там не потрібна.
+const BCRYPT_ROUNDS = env.NODE_ENV === 'test' ? 4 : 10;
 
 export class AuthService {
   constructor(private readonly repo: AuthRepository) {}
