@@ -269,37 +269,45 @@ Rules:
 `deletedAt DateTime?` on Workspace / Project / Task. Permanent delete is a separate, OWNER-only endpoint doing a real `delete`.
 
 - **Cascade is manual, inside a transaction.** `onDelete: Cascade` is a DB rule for a physical `DELETE`; it does not fire on `UPDATE deletedAt`. The schema keeps `Cascade` for the permanent-delete path.
-- **Cascade bottom-up** (tasks → projects → workspace) and share one `const now = new Date()` across all statements. Never filter children by a parent field you are changing in the same transaction — inside `tx` the change is already visible, so the child update matches zero rows and `updateMany` reports it silently.
+- **Order: the scoped parent first, then children by FK.** The parent `update` carries the tenant filter (`where: { id, workspaceId, deletedAt: null }`), so it doubles as the access check: a foreign or missing row throws `P2025` and the whole transaction rolls back before any child is touched. Children are then filtered by the parent's **id** (`projectId: id`, `project: { workspaceId: id }`) — never by a parent field changed in the same transaction (`project: { deletedAt: null }`): inside `tx` the change is already visible, the child update matches zero rows and `updateMany` reports it silently. Share one `const now = new Date()` across all statements.
 - **The parent row uses `update`** (throws `P2025` → `NotFoundError`); permissions are proven by the guard before the transaction starts. **Children use `updateMany`**, which never throws on zero matches — fine here, a workspace with no projects is valid.
 - **`deletedAt: null` lives only in the repository** — including inside nested `include`, which is where it is most often forgotten (`projects: { where: { deletedAt: null } }`).
 - **Freeing the slug**: on soft delete rewrite it (`deleted-${id}-${nanoid(6)}`) so a new workspace can reuse the name. A partial unique index (`WHERE deletedAt IS NULL`) is deliberately not used — Prisma cannot express it, and raw SQL causes permanent drift.
 
 ## API Endpoints
 
-| Method | Path                                           | Auth | Min role | Description                                                 |
-| ------ | ---------------------------------------------- | ---- | -------- | ----------------------------------------------------------- |
-| POST   | /api/auth/register                             | No   | —        | Create user account                                         |
-| POST   | /api/auth/login                                | No   | —        | Get JWT token                                               |
-| POST   | /api/auth/logout                               | Yes  | —        | Blacklist token in Redis                                    |
-| POST   | /api/workspaces                                | Yes  | —        | Create workspace (creator = OWNER)                          |
-| GET    | /api/workspaces                                | Yes  | —        | List my workspaces                                          |
-| GET    | /api/workspaces/trash                          | Yes  | —        | List my soft-deleted workspaces                             |
-| GET    | /api/workspaces/:workspaceId                   | Yes  | MEMBER   | Workspace + members + projects                              |
-| PATCH  | /api/workspaces/:workspaceId                   | Yes  | ADMIN    | Rename workspace, returns the workspace                     |
-| DELETE | /api/workspaces/:workspaceId                   | Yes  | OWNER    | Soft delete (cascades manually)                             |
-| DELETE | /api/workspaces/:workspaceId/permanent         | Yes  | OWNER    | Permanent delete; 409 if not in trash                       |
-| GET    | /api/workspaces/:workspaceId/members           | Yes  | MEMBER   | List members (user id + email)                              |
-| POST   | /api/workspaces/:workspaceId/members           | Yes  | ADMIN    | Add by email; 404 unknown user, 409 duplicate               |
-| PATCH  | /api/workspaces/:workspaceId/members/:memberId | Yes  | ADMIN    | Change role (target and new role below own)                 |
-| DELETE | /api/workspaces/:workspaceId/members/:memberId | Yes  | MEMBER   | Kick (ADMIN+, target below own) or leave (anyone but OWNER) |
-| GET    | /api/tasks                                     | Yes  | MEMBER   | List tasks                                                  |
-| POST   | /api/tasks                                     | Yes  | MEMBER   | Create task — ⚠ blocked, see below                          |
-| PUT    | /api/tasks/:id                                 | Yes  | MEMBER   | Update task fields                                          |
-| DELETE | /api/tasks/:id                                 | Yes  | MEMBER   | Delete task                                                 |
-| GET    | /ping                                          | No   | —        | Health check                                                |
-| GET    | /docs                                          | No   | —        | Swagger UI                                                  |
+| Method | Path                                                       | Auth | Min role | Description                                                 |
+| ------ | ---------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------- |
+| POST   | /api/auth/register                                         | No   | —        | Create user account                                         |
+| POST   | /api/auth/login                                            | No   | —        | Get JWT token                                               |
+| POST   | /api/auth/logout                                           | Yes  | —        | Blacklist token in Redis                                    |
+| POST   | /api/workspaces                                            | Yes  | —        | Create workspace (creator = OWNER)                          |
+| GET    | /api/workspaces                                            | Yes  | —        | List my workspaces                                          |
+| GET    | /api/workspaces/trash                                      | Yes  | —        | List my soft-deleted workspaces                             |
+| GET    | /api/workspaces/:workspaceId                               | Yes  | MEMBER   | Workspace + members + projects                              |
+| PATCH  | /api/workspaces/:workspaceId                               | Yes  | ADMIN    | Rename workspace, returns the workspace                     |
+| DELETE | /api/workspaces/:workspaceId                               | Yes  | OWNER    | Soft delete (cascades manually)                             |
+| DELETE | /api/workspaces/:workspaceId/permanent                     | Yes  | OWNER    | Permanent delete; 409 if not in trash                       |
+| GET    | /api/workspaces/:workspaceId/members                       | Yes  | MEMBER   | List members (user id + email)                              |
+| POST   | /api/workspaces/:workspaceId/members                       | Yes  | ADMIN    | Add by email; 404 unknown user, 409 duplicate               |
+| PATCH  | /api/workspaces/:workspaceId/members/:memberId             | Yes  | ADMIN    | Change role (target and new role below own)                 |
+| DELETE | /api/workspaces/:workspaceId/members/:memberId             | Yes  | MEMBER   | Kick (ADMIN+, target below own) or leave (anyone but OWNER) |
+| GET    | /api/workspaces/:workspaceId/projects                      | Yes  | MEMBER   | List projects                                               |
+| POST   | /api/workspaces/:workspaceId/projects                      | Yes  | MANAGER  | Create project                                              |
+| GET    | /api/workspaces/:workspaceId/projects/:projectId           | Yes  | MEMBER   | One project                                                 |
+| PATCH  | /api/workspaces/:workspaceId/projects/:projectId           | Yes  | MANAGER  | Rename project                                              |
+| DELETE | /api/workspaces/:workspaceId/projects/:projectId           | Yes  | MANAGER  | Soft delete (cascades to tasks)                             |
+| DELETE | /api/workspaces/:workspaceId/projects/:projectId/permanent | Yes  | OWNER    | Permanent delete; 404 if not in trash                       |
+| GET    | /api/tasks                                                 | Yes  | MEMBER   | List tasks                                                  |
+| POST   | /api/tasks                                                 | Yes  | MEMBER   | Create task — ⚠ blocked, see below                          |
+| PUT    | /api/tasks/:id                                             | Yes  | MEMBER   | Update task fields                                          |
+| DELETE | /api/tasks/:id                                             | Yes  | MEMBER   | Delete task                                                 |
+| GET    | /ping                                                      | No   | —        | Health check                                                |
+| GET    | /docs                                                      | No   | —        | Swagger UI                                                  |
 
 "Min role" is the `requireMembership` floor; `—` means no guard (no `:workspaceId` in the path). Register static route segments (`/trash`) before parametric ones (`/:workspaceId`).
+
+**Nested resources (projects, later tasks):** the guard proves the _workspace_, not the child. Every single-row query is scoped by the pair `{ id, workspaceId }` — otherwise a member of A can address a project of B through `/workspaces/A/projects/<id-from-B>` (IDOR). For the same reason `P2025` on a nested resource means "missing, foreign or wrong state" and is translated to 404; a 409 like on the workspace's own permanent delete is only honest when the guard has already proven the row exists.
 
 **Known gap:** the tasks module is still on the Phase 1 model — it scopes by `Task.userId` and has no project. `tasksRepository.create` throws on purpose until the module is reworked to be project-scoped and tenant-isolated.
 

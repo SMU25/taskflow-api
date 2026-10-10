@@ -15,6 +15,7 @@ import { env } from './config/env';
 import { prisma } from './lib/prisma';
 import { authRoutes } from './modules/auth/auth.routes';
 import { memberRoutes } from './modules/members/members.routes';
+import { projectRoutes } from './modules/projects/projects.routes';
 import { taskRoutes } from './modules/tasks/tasks.routes';
 import { workspaceRoutes } from './modules/workspaces/workspaces.routes';
 import { registerAuth } from './plugins/auth';
@@ -45,6 +46,7 @@ export function buildApp() {
         { name: 'Tasks', description: 'CRUD operations for Tasks' },
         { name: 'Workspaces', description: 'CRUD operations for Workspaces' },
         { name: 'Members', description: 'CRUD operations for Members' },
+        { name: 'Projects', description: 'CRUD operations for Projects' },
       ],
     },
     transform: jsonSchemaTransform,
@@ -67,6 +69,9 @@ export function buildApp() {
   app.register(workspaceRoutes, { prefix: '/api/workspaces' });
   app.register(memberRoutes, {
     prefix: '/api/workspaces/:workspaceId/members',
+  });
+  app.register(projectRoutes, {
+    prefix: '/api/workspaces/:workspaceId/projects',
   });
 
   app.get('/ping', { schema: { hide: true } }, async () => ({
