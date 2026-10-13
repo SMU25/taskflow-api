@@ -39,8 +39,8 @@ export class ProjectsService {
     return this.repo.softDelete(scope);
   }
 
-  async permanentlyDelete(scope: ProjectScope) {
-    await this.repo.permanentlyDelete(scope);
+  permanentlyDelete(scope: ProjectScope) {
+    return this.repo.permanentlyDelete(scope);
   }
 }
 

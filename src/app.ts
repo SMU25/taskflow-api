@@ -66,13 +66,15 @@ export function buildApp() {
   registerMembership(app);
 
   app.register(authRoutes, { prefix: '/api/auth' });
-  app.register(taskRoutes, { prefix: '/api/tasks' });
   app.register(workspaceRoutes, { prefix: '/api/workspaces' });
   app.register(memberRoutes, {
     prefix: '/api/workspaces/:workspaceId/members',
   });
   app.register(projectRoutes, {
     prefix: '/api/workspaces/:workspaceId/projects',
+  });
+  app.register(taskRoutes, {
+    prefix: '/api/workspaces/:workspaceId/projects/:projectId/tasks',
   });
 
   app.get('/ping', { schema: { hide: true } }, async () => ({

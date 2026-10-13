@@ -137,7 +137,6 @@ describe('projects', () => {
       const { workspace, manager } = await seedWorkspace();
       const doomed = await createProject(manager, workspace.id, 'Doomed');
       const kept = await createProject(manager, workspace.id, 'Kept');
-      // Таски через API ще не створюються (Крок 6) — кладемо напряму.
       await prisma.task.createMany({
         data: [
           { title: 'A', userId: manager.id, projectId: doomed.id },

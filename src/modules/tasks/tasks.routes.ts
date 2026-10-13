@@ -7,8 +7,8 @@ import { errorResponseSchema } from '../../schemas/common.schemas.js';
 import {
   createTaskBodySchema,
   taskParamsSchema,
+  taskParamsScopeSchema,
   taskResponseSchema,
-  taskUpdateResponseSchema,
   tasksListResponseSchema,
   updateTaskBodySchema,
 } from './tasks.schemas.js';
@@ -22,16 +22,31 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   app.post(
     '/',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Tasks'],
         summary: 'Create a new task',
         security: [{ bearerAuth: [] }],
+        params: taskParamsScopeSchema,
         body: createTaskBodySchema,
-        response: { 201: taskResponseSchema, 400: errorResponseSchema },
+        response: {
+          201: taskResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
       },
     },
     async (request, reply) => {
-      const task = await tasksService.create(request.user.id, request.body);
+      const { params, body, user } = request;
+
+      const task = await tasksService.create(
+        {
+          projectId: params.projectId,
+          workspaceId: params.workspaceId,
+        },
+        user.id,
+        body,
+      );
 
       return reply.status(201).send(task);
     },
@@ -40,19 +55,60 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
   app.get(
     '/',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Tasks'],
-        summary: 'Get all tasks for the authenticated user',
+        summary: 'List tasks of the project',
         security: [{ bearerAuth: [] }],
-        response: { 200: tasksListResponseSchema },
+        params: taskParamsScopeSchema,
+        response: {
+          200: tasksListResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
       },
     },
-    (request) => tasksService.list(request.user.id),
+    (request) => {
+      const { params } = request;
+
+      return tasksService.list({
+        projectId: params.projectId,
+        workspaceId: params.workspaceId,
+      });
+    },
   );
 
-  app.put(
-    '/:id',
+  app.get(
+    '/:taskId',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
+      schema: {
+        tags: ['Tasks'],
+        summary: 'Get a task by ID',
+        security: [{ bearerAuth: [] }],
+        params: taskParamsSchema,
+        response: {
+          200: taskResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    (request) => {
+      const { params } = request;
+
+      return tasksService.itemById({
+        id: params.taskId,
+        projectId: params.projectId,
+        workspaceId: params.workspaceId,
+      });
+    },
+  );
+
+  app.patch(
+    '/:taskId',
+    {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Tasks'],
         summary: 'Update a task by ID',
@@ -60,29 +116,80 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
         params: taskParamsSchema,
         body: updateTaskBodySchema,
         response: {
-          200: taskUpdateResponseSchema,
-          404: errorResponseSchema,
+          200: taskResponseSchema,
           400: errorResponseSchema,
+          404: errorResponseSchema,
         },
       },
     },
-    (request) =>
-      tasksService.update(request.user.id, request.params.id, request.body),
+    (request) => {
+      const { params, body } = request;
+
+      return tasksService.update(
+        {
+          id: params.taskId,
+          projectId: params.projectId,
+          workspaceId: params.workspaceId,
+        },
+        body,
+      );
+    },
   );
 
   app.delete(
-    '/:id',
+    '/:taskId',
     {
+      preHandler: fastify.requireMembership('MEMBER'),
       schema: {
         tags: ['Tasks'],
         summary: 'Delete a task by ID',
         security: [{ bearerAuth: [] }],
         params: taskParamsSchema,
-        response: { 204: z.void(), 404: errorResponseSchema },
+        response: {
+          204: z.void(),
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
       },
     },
     async (request, reply) => {
-      await tasksService.remove(request.user.id, request.params.id);
+      const { params } = request;
+
+      await tasksService.remove({
+        id: params.taskId,
+        projectId: params.projectId,
+        workspaceId: params.workspaceId,
+      });
+
+      return reply.status(204).send();
+    },
+  );
+
+  app.delete(
+    '/:taskId/permanent',
+    {
+      preHandler: fastify.requireMembership('OWNER'),
+      schema: {
+        tags: ['Tasks'],
+        summary: 'Permanently delete a trashed task (OWNER)',
+        security: [{ bearerAuth: [] }],
+        params: taskParamsSchema,
+        response: {
+          204: z.void(),
+          400: errorResponseSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { params } = request;
+
+      await tasksService.permanentlyDelete({
+        id: params.taskId,
+        projectId: params.projectId,
+        workspaceId: params.workspaceId,
+      });
 
       return reply.status(204).send();
     },

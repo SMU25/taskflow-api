@@ -1,27 +1,110 @@
-import { prisma } from '../../lib/prisma.js';
-import type { CreateTaskData, UpdateTaskData } from './tasks.types.js';
+import { Prisma } from '../../generated/prisma/client';
+import { NotFoundError } from '../../lib/errors';
+import { prisma } from '../../lib/prisma';
+import type {
+  CreateTaskData,
+  ProjectRef,
+  TaskScope,
+  UpdateTaskData,
+} from './tasks.types';
 
 export class TasksRepository {
-  listByUser(userId: string) {
+  listByProject({ projectId, workspaceId }: ProjectRef) {
     return prisma.task.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+      where: {
+        projectId,
+        deletedAt: null,
+        project: { workspaceId, deletedAt: null },
+      },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
-  // TODO(Крок 6): таска створюється тільки всередині проєкту.
-  // `never` — бо функція завжди кидає; без цього TS виводить `void`
-  // і ламає `reply.send(task)` у роуті.
-  create(_data: CreateTaskData): never {
-    throw new Error('Tasks require a project — див. Крок 6');
+  findInProject({ id, projectId, workspaceId }: TaskScope) {
+    return prisma.task.findFirst({
+      where: {
+        id,
+        projectId,
+        deletedAt: null,
+        project: { workspaceId, deletedAt: null },
+      },
+    });
   }
 
-  updateOwned(where: { id: string; userId: string }, data: UpdateTaskData) {
-    return prisma.task.updateMany({ where, data });
+  create(data: CreateTaskData) {
+    return prisma.task.create({
+      data,
+    });
   }
 
-  deleteOwned(where: { id: string; userId: string }) {
-    return prisma.task.deleteMany({ where });
+  async update(
+    { id, projectId, workspaceId }: TaskScope,
+    data: UpdateTaskData,
+  ) {
+    try {
+      return await prisma.task.update({
+        where: {
+          id,
+          projectId,
+          deletedAt: null,
+          project: { workspaceId, deletedAt: null },
+        },
+        data,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundError('Task not found');
+      }
+      throw error;
+    }
+  }
+
+  async softDelete({ id, projectId, workspaceId }: TaskScope) {
+    try {
+      return await prisma.task.update({
+        where: {
+          id,
+          projectId,
+          deletedAt: null,
+          project: { workspaceId, deletedAt: null },
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundError('Task not found');
+      }
+      throw error;
+    }
+  }
+
+  async permanentlyDelete({ id, projectId, workspaceId }: TaskScope) {
+    try {
+      return await prisma.task.delete({
+        where: {
+          id,
+          projectId,
+          deletedAt: { not: null },
+          project: { workspaceId },
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundError('Task not found in trash');
+      }
+      throw error;
+    }
   }
 }
 

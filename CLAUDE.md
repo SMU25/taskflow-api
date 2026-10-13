@@ -306,18 +306,22 @@ Rules:
 | PATCH  | /api/workspaces/:workspaceId/projects/:projectId           | Yes  | MANAGER  | Rename project                                              |
 | DELETE | /api/workspaces/:workspaceId/projects/:projectId           | Yes  | MANAGER  | Soft delete (cascades to tasks)                             |
 | DELETE | /api/workspaces/:workspaceId/projects/:projectId/permanent | Yes  | OWNER    | Permanent delete; 404 if not in trash                       |
-| GET    | /api/tasks                                                 | Yes  | MEMBER   | List tasks                                                  |
-| POST   | /api/tasks                                                 | Yes  | MEMBER   | Create task — ⚠ blocked, see below                          |
-| PUT    | /api/tasks/:id                                             | Yes  | MEMBER   | Update task fields                                          |
-| DELETE | /api/tasks/:id                                             | Yes  | MEMBER   | Delete task                                                 |
+| GET    | …/projects/:projectId/tasks                                | Yes  | MEMBER   | List tasks of the project (oldest first)                    |
+| POST   | …/projects/:projectId/tasks                                | Yes  | MEMBER   | Create; author = JWT user; 404 foreign/trashed project      |
+| GET    | …/projects/:projectId/tasks/:taskId                        | Yes  | MEMBER   | One task                                                    |
+| PATCH  | …/projects/:projectId/tasks/:taskId                        | Yes  | MEMBER   | Any member edits any task; `dueDate: null` clears it        |
+| DELETE | …/projects/:projectId/tasks/:taskId                        | Yes  | MEMBER   | Soft delete                                                 |
+| DELETE | …/projects/:projectId/tasks/:taskId/permanent              | Yes  | OWNER    | Permanent delete; 404 if not in trash                       |
 | GET    | /ping                                                      | No   | —        | Health check                                                |
 | GET    | /docs                                                      | No   | —        | Swagger UI                                                  |
 
-"Min role" is the `requireMembership` floor; `—` means no guard (no `:workspaceId` in the path). Register static route segments (`/trash`) before parametric ones (`/:workspaceId`).
+"Min role" is the `requireMembership` floor; `—` means no guard (no `:workspaceId` in the path). Register static route segments (`/trash`) before parametric ones (`/:workspaceId`). `…` = `/api/workspaces/:workspaceId`.
 
-**Nested resources (projects, later tasks):** the guard proves the _workspace_, not the child. Every single-row query is scoped by the pair `{ id, workspaceId }` — otherwise a member of A can address a project of B through `/workspaces/A/projects/<id-from-B>` (IDOR). For the same reason `P2025` on a nested resource means "missing, foreign or wrong state" and is translated to 404; a 409 like on the workspace's own permanent delete is only honest when the guard has already proven the row exists.
+**A path segment and its params-schema key must have the same name** (`'/:taskId'` ↔ `taskId: z.uuid()`). A mismatch type-checks fine — TS sees only the schema, the path is just a string — and turns every request into a 400.
 
-**Known gap:** the tasks module is still on the Phase 1 model — it scopes by `Task.userId` and has no project. `tasksRepository.create` throws on purpose until the module is reworked to be project-scoped and tenant-isolated.
+**Nested resources (projects, tasks):** the guard proves the _workspace_, not the child. Every single-row query is scoped by the pair `{ id, workspaceId }` — otherwise a member of A can address a project of B through `/workspaces/A/projects/<id-from-B>` (IDOR). For the same reason `P2025` on a nested resource means "missing, foreign or wrong state" and is translated to 404; a 409 like on the workspace's own permanent delete is only honest when the guard has already proven the row exists.
+
+**Two levels for tasks.** A task query carries the whole chain: `where: { id, projectId, deletedAt: null, project: { workspaceId, deletedAt: null } }`. `projectId` alone stops a task from project X being addressed through project Y of the same workspace; `project.workspaceId` stops a project from workspace B being addressed through A's URL. Creating a task first proves the project with `projectsRepository.findInWorkspace` (404 otherwise) — an FK only proves the project exists, not that it is ours or alive.
 
 ## Testing
 
@@ -328,13 +332,13 @@ Integration tests only: `app.inject()` drives the full stack (authenticate → v
 - **Schema:** `prisma migrate deploy` once per run — applies new migrations, never wipes. If the test DB drifts (an edited migration), drop `<db>_test` and rerun.
 - **Write a test as a scenario:** `seedWorkspace()` gives `{ workspace, owner, admin, manager, member, outsider }` (each with `token`, `id`, and `memberId` where relevant). Call `api(user).patch(url, body)`, assert with `expect(res.statusCode, res.body).toBe(...)` — the second argument prints the response body when it fails.
 - **Role matrices** go through `it.each([['member', 403], ['admin', 200]] as const)` with `seed[role]`.
-- **Use `prisma` directly in a test only** to arrange data the API cannot create yet (tasks before Step 6) or to assert DB state the API does not expose (`deletedAt`, row count after permanent delete).
+- **Use `prisma` directly in a test only** to arrange bulk data quickly or to assert DB state the API does not expose (`deletedAt`, row count after permanent delete, "the foreign row is untouched").
 - **Test mode in `src`:** `NODE_ENV=test` turns off the Fastify request logger and drops bcrypt to 4 rounds (49 s → 10 s). Nothing else in `src` may branch on `NODE_ENV`.
 - **A test must be able to fail.** When adding a guard/filter, break it once locally and check the test goes red.
 
 ## Scheduler
 
-`initScheduler()` in `src/lib/cron.ts` runs every minute and logs `console.warn` for any `pending` task whose `dueDate` is in the past.
+`initScheduler()` in `src/lib/cron.ts` runs every minute and `log.warn`s (`{ taskId, userId }`, never email) for any live `pending` task whose `dueDate` is in the past. "Live" = task and its project not soft-deleted.
 
 ## Adding a New Module
 

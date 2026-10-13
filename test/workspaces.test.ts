@@ -103,7 +103,6 @@ describe('workspaces', () => {
     it('cascades to projects and tasks with one timestamp', async () => {
       const { workspace, owner } = await seedWorkspace();
       const project = await createProject(owner, workspace.id);
-      // Таски через API ще не створюються (Крок 6) — кладемо напряму.
       await prisma.task.create({
         data: { title: 'T', userId: owner.id, projectId: project.id },
       });
