@@ -1,20 +1,52 @@
-import { NotFoundError } from '../../lib/errors.js';
-import { tasksRepository } from './tasks.repository.js';
-import type { CreateTaskBody, UpdateTaskBody } from './tasks.schemas.js';
-import type { UpdateTaskData } from './tasks.types.js';
+import { NotFoundError } from '../../lib/errors';
+import {
+  type ProjectsRepository,
+  projectsRepository,
+} from '../projects/projects.repository';
+import { type TasksRepository, tasksRepository } from './tasks.repository';
+import type { CreateTaskBody, UpdateTaskBody } from './tasks.schemas';
+import type { ProjectRef, TaskScope, UpdateTaskData } from './tasks.types';
 
-export const tasksService = {
-  list: (userId: string) => tasksRepository.listByUser(userId),
+export class TasksService {
+  constructor(
+    private readonly repo: TasksRepository,
+    private readonly projects: ProjectsRepository,
+  ) {}
 
-  create: (userId: string, input: CreateTaskBody) =>
-    tasksRepository.create({
-      title: input.title,
+  list(ref: ProjectRef) {
+    return this.repo.listByProject(ref);
+  }
+
+  async itemById(scope: TaskScope) {
+    const task = await this.repo.findInProject(scope);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    return task;
+  }
+
+  async create(ref: ProjectRef, authorId: string, input: CreateTaskBody) {
+    const project = await this.projects.findInWorkspace({
+      id: ref.projectId,
+      workspaceId: ref.workspaceId,
+    });
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    return this.repo.create({
+      projectId: ref.projectId,
+      userId: authorId,
       description: input.description ?? null,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      userId,
-    }),
+      title: input.title,
+    });
+  }
 
-  async update(userId: string, id: string, input: UpdateTaskBody) {
+  async update(scope: TaskScope, input: UpdateTaskBody) {
     const data: UpdateTaskData = {};
 
     if (input.title !== undefined) {
@@ -29,13 +61,23 @@ export const tasksService = {
       data.status = input.status;
     }
 
-    const result = await tasksRepository.updateOwned({ id, userId }, data);
-    if (result.count === 0) throw new NotFoundError('Task not found');
-    return { message: 'Task updated successfully' };
-  },
+    if (input.dueDate !== undefined) {
+      data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
+    }
 
-  async remove(userId: string, id: string) {
-    const result = await tasksRepository.deleteOwned({ id, userId });
-    if (result.count === 0) throw new NotFoundError('Task not found');
-  },
-};
+    return this.repo.update(scope, data);
+  }
+
+  remove(scope: TaskScope) {
+    return this.repo.softDelete(scope);
+  }
+
+  permanentlyDelete(scope: TaskScope) {
+    return this.repo.permanentlyDelete(scope);
+  }
+}
+
+export const tasksService = new TasksService(
+  tasksRepository,
+  projectsRepository,
+);

@@ -1,5 +1,6 @@
 /node_modules
-/src/generated/prisma
+# Згенероване — відтворюється через `prisma generate`, у git не тримаємо.
+/src/generated
 /dist
 /build
 /logs

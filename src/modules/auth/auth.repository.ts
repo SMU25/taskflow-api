@@ -3,8 +3,10 @@ import { ConflictError } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import type { CreateUserData } from './auth.types.js';
 
-export const authRepository = {
-  findByEmail: (email: string) => prisma.user.findUnique({ where: { email } }),
+export class AuthRepository {
+  findByEmail(email: string) {
+    return prisma.user.findUnique({ where: { email } });
+  }
 
   async create(data: CreateUserData) {
     try {
@@ -22,5 +24,7 @@ export const authRepository = {
       }
       throw error;
     }
-  },
-};
+  }
+}
+
+export const authRepository = new AuthRepository();

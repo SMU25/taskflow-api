@@ -1,15 +1,29 @@
 import type { TaskStatus } from '../../generated/prisma/enums.js';
 
-// interface — для форми об'єкта (за твоїм CLAUDE.md: interface для shape, type для юніонів)
+/** Таску завжди шукаємо разом із проєктом і воркспейсом (IDOR на два рівні). */
+export interface TaskScope {
+  id: string;
+  projectId: string;
+  workspaceId: string;
+}
+
+/** Проєкт, у якому працюємо: для list і create. */
+export interface ProjectRef {
+  projectId: string;
+  workspaceId: string;
+}
+
 export interface CreateTaskData {
   title: string;
   description: string | null;
   dueDate: Date | null;
-  userId: string;
+  projectId: string;
+  userId: string; // автор — аудит
 }
 
-export interface UpdateTaskData extends Partial<
-  Pick<CreateTaskData, 'title' | 'description'>
-> {
-  status?: TaskStatus; // TaskStatus — це вже union-type із generated, єдине джерело правди
+export interface UpdateTaskData {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  dueDate?: Date | null;
 }

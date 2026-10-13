@@ -11,15 +11,20 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 
-import { env } from './config/env.js';
-import { prisma } from './lib/prisma.js';
-import { authRoutes } from './modules/auth/auth.routes.js';
-import { taskRoutes } from './modules/tasks/tasks.routes.js';
-import { registerAuth } from './plugins/auth.js';
-import { registerErrorHandler } from './plugins/errorHandler.js';
+import { env } from './config/env';
+import { prisma } from './lib/prisma';
+import { authRoutes } from './modules/auth/auth.routes';
+import { memberRoutes } from './modules/members/members.routes';
+import { projectRoutes } from './modules/projects/projects.routes';
+import { taskRoutes } from './modules/tasks/tasks.routes';
+import { workspaceRoutes } from './modules/workspaces/workspaces.routes';
+import { registerAuth } from './plugins/auth';
+import { registerErrorHandler } from './plugins/errorHandler';
+import { registerMembership } from './plugins/membership';
 
 export function buildApp() {
-  const app = Fastify({ logger: true });
+  // У тестах лог кожного запиту топить звіт Vitest; помилки й так видно в assert'ах.
+  const app = Fastify({ logger: env.NODE_ENV !== 'test' });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -39,7 +44,10 @@ export function buildApp() {
       },
       tags: [
         { name: 'Auth', description: 'Registration, login, logout' },
-        { name: 'Tasks', description: 'CRUD operations for tasks' },
+        { name: 'Tasks', description: 'CRUD operations for Tasks' },
+        { name: 'Workspaces', description: 'CRUD operations for Workspaces' },
+        { name: 'Members', description: 'CRUD operations for Members' },
+        { name: 'Projects', description: 'CRUD operations for Projects' },
       ],
     },
     transform: jsonSchemaTransform,
@@ -55,9 +63,19 @@ export function buildApp() {
 
   registerAuth(app); // decorate fastify.authenticate — ДО реєстрації роутів, що його юзають
   registerErrorHandler(app); // setErrorHandler — тепер конверт помилок активний
+  registerMembership(app);
 
   app.register(authRoutes, { prefix: '/api/auth' });
-  app.register(taskRoutes, { prefix: '/api/tasks' });
+  app.register(workspaceRoutes, { prefix: '/api/workspaces' });
+  app.register(memberRoutes, {
+    prefix: '/api/workspaces/:workspaceId/members',
+  });
+  app.register(projectRoutes, {
+    prefix: '/api/workspaces/:workspaceId/projects',
+  });
+  app.register(taskRoutes, {
+    prefix: '/api/workspaces/:workspaceId/projects/:projectId/tasks',
+  });
 
   app.get('/ping', { schema: { hide: true } }, async () => ({
     status: 'OK',

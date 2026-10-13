@@ -10,14 +10,23 @@ export function initScheduler(log: FastifyBaseLogger) {
     const now = new Date();
 
     const overdueTasks = await prisma.task.findMany({
-      where: { status: 'pending', dueDate: { lt: now } },
-      include: { user: true },
+      where: {
+        status: 'pending',
+        dueDate: { lt: now },
+        deletedAt: null,
+        project: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+      },
     });
 
     for (const task of overdueTasks) {
       log.warn(
-        { taskId: task.id, userEmail: task.user.email },
-        `🚨 ALERT: Task ID: ${task.id} ("${task.title}") for user ${task.user.email} is OVERDUE!`,
+        { taskId: task.id, userId: task.userId },
+        `🚨 ALERT: Task ID: ${task.id} ("${task.title}") for user ${task.userId} is OVERDUE!`,
       );
     }
   });

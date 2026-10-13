@@ -6,14 +6,22 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "create:migration": "prisma migrate dev --create only",
+    "create-and-apply:migration": "prisma migrate dev --name",
+    "typecheck": "tsc --noEmit",
     "studio": "prisma studio",
+    "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.9.1",
@@ -28,6 +36,7 @@
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1",
+    "vitest": "^5.0.3",
     "zod-prisma-types": "^3.3.11"
   },
   "dependencies": {
@@ -41,8 +50,10 @@
     "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "fastify-type-provider-zod": "^6.1.0",
+    "nanoid": "^6.0.1",
     "node-cron": "^4.2.1",
     "pg": "^8.21.0",
+    "slugify": "^1.6.9",
     "zod": "^4.4.3"
   }
 }

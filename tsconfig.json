@@ -26,7 +26,10 @@
     // Style Options
     // "noImplicitReturns": true,
     // "noImplicitOverride": true,
-    "noUnusedLocals": true,
+    // noUnusedLocals — вимкнено свідомо: невикористані імпорти ловить
+    // eslint-plugin-unused-imports (тільки по нашому коду), а tsc через цю
+    // опцію робив червоним білд через згенерований zod-клієнт.
+    // "noUnusedLocals": true,
     // "noUnusedParameters": true,
     // "noFallthroughCasesInSwitch": true,
     // "noPropertyAccessFromIndexSignature": true,
@@ -39,5 +42,6 @@
     "moduleDetection": "force",
     "strict": true,
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["./prisma/backfills/**"]
 }
